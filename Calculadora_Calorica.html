@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🥗 Calculadora Calórica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#fff8f0;
+    --card:#ffffff;
+    --ink:#2b2140;
+    --ink-soft:#7a7190;
+    --line:#f3e7d8;
+
+    --primary:#ff6b4a;
+    --primary-dark:#e6502f;
+    --secondary:#00b8a9;
+    --accent:#ffd166;
+    --pink:#ff5c8a;
+
+    --s-verano:#ffb703;
+    --s-otono:#e07a35;
+    --s-invierno:#4d8fd6;
+    --s-primavera:#5fb85a;
+  }
+  *{ -webkit-tap-highlight-color: transparent; }
+  body{ font-family:'Manrope', sans-serif; background:var(--bg); color:var(--ink); }
+  .font-display{ font-family:'Poppins', sans-serif; }
+
+  .hero{ background:linear-gradient(135deg, var(--primary), var(--pink) 60%, var(--accent)); }
+  .hero::after{
+    content:'';
+    position:absolute; inset:0;
+    background:radial-gradient(circle at 85% 15%, rgba(255,255,255,0.25), transparent 55%);
+  }
+
+  .tabbar{ background:#f1e9dd; }
+  .tab-btn{
+    font-family:'Manrope',sans-serif; font-weight:700; font-size:0.82rem;
+    color:var(--ink-soft); padding:0.55rem 0.4rem; border-radius:999px; flex:1;
+    transition:all .18s ease;
+  }
+  .tab-btn.active{ background:var(--card); color:var(--primary-dark); box-shadow:0 2px 8px rgba(43,33,64,0.12); }
+
+  .card{ background:var(--card); border:1px solid var(--line); }
+
+  .profile-pill{
+    border:2px solid var(--line); background:#fff; border-radius:999px;
+    font-weight:700; font-size:0.82rem; transition:all .15s ease;
+  }
+  .profile-pill.active{ border-color:var(--secondary); background:#e6faf7; color:#00786d; }
+
+  .field-pill{
+    background:#fbf3e8; border:2px solid transparent; border-radius:1rem;
+    padding:0.65rem 0.9rem; transition:border-color .18s ease, background .18s ease; font-weight:600;
+  }
+  .field-pill:focus{ outline:none; border-color:var(--primary); background:#fff; }
+  select.field-pill{
+    appearance:none;
+    background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7190' stroke-width='2.5'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat:no-repeat; background-position:right 0.75rem center; background-size:1.1rem; padding-right:2.2rem;
+  }
+  .label-tag{ font-size:0.72rem; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+
+  .toggle-btn{ border:2px solid var(--line); background:#fff; border-radius:1rem; font-weight:700; transition:all .15s ease; }
+  .toggle-btn.active{ border-color:var(--primary); background:#fff1ec; color:var(--primary-dark); }
+
+  .btn-primary{
+    background:linear-gradient(135deg, var(--primary), var(--pink)); color:#fff; font-weight:800;
+    box-shadow:0 8px 20px -6px rgba(255,92,138,0.55); transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary:hover{ transform:translateY(-1px); box-shadow:0 10px 24px -6px rgba(255,92,138,0.65); }
+  .btn-primary:active{ transform:scale(0.98); }
+
+  .btn-soft{ background:#fff1ec; color:var(--primary-dark); font-weight:700; transition:all .15s ease; }
+  .btn-soft:hover{ background:#ffe2d6; }
+
+  .chip{ font-size:0.82rem; font-weight:700; border:2px solid var(--line); color:var(--ink-soft); background:#fff; transition:all .15s ease; }
+  .chip.active{ border-color:var(--chip-color, var(--primary)); background:color-mix(in srgb, var(--chip-color, var(--primary)) 15%, white); color:var(--ink); }
+
+  .stat-card{ border-radius:1.25rem; padding:1rem 1.1rem; }
+
+  .day-card summary{ list-style:none; cursor:pointer; }
+  .day-card summary::-webkit-details-marker{ display:none; }
+  .meal-row{ background:#fbf3e8; border-radius:0.9rem; }
+
+  .streak-badge{
+    background:rgba(255,255,255,0.25); backdrop-filter:blur(4px);
+    display:inline-flex; align-items:center; gap:0.35rem; font-weight:800; font-size:0.8rem;
+    border-radius:999px; padding:0.35rem 0.8rem;
+  }
+
+  .streak-badge.hidden{ display:none; }
+  dialog{ margin:auto; border:1px solid var(--line); }
+  dialog::backdrop{ background:rgba(43,33,64,0.45); }
+  :focus-visible{ outline:2px solid var(--primary); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body class="px-4 py-8 sm:py-12">
+
+  <div class="max-w-lg mx-auto">
+
+    <!-- Cuenta -->
+    <div id="authBar" class="items-center justify-between gap-2 mb-3" style="display:none"></div>
+
+    <!-- Hero -->
+    <div class="hero relative overflow-hidden rounded-3xl p-6 mb-4 text-white">
+      <p class="font-display text-xs font-bold uppercase tracking-wide opacity-90 mb-1">🥗 Tu compañera diaria</p>
+      <h1 class="font-display text-3xl sm:text-4xl font-extrabold leading-tight mb-2">Calculadora<br>Calórica</h1>
+      <p class="text-sm opacity-95 max-w-xs mb-3">Calculá tu gasto diario, seguí tu progreso y descubrí recetas de estación — solo o en pareja.</p>
+      <div id="streakBadge" class="streak-badge">🔥 <span id="streakCount">0</span> días seguidos</div>
+    </div>
+
+    <!-- Selector de perfil (pareja) -->
+    <div class="flex gap-2 mb-5">
+      <div class="flex-1 flex items-center gap-1">
+        <button id="profileBtn1" class="profile-pill flex-1 py-2 px-3" onclick="switchProfile(1)"></button>
+        <button onclick="renamePerfil(1)" class="text-sm opacity-50 hover:opacity-100 px-1" title="Renombrar">✏️</button>
+      </div>
+      <div class="flex-1 flex items-center gap-1">
+        <button id="profileBtn2" class="profile-pill flex-1 py-2 px-3" onclick="switchProfile(2)"></button>
+        <button onclick="renamePerfil(2)" class="text-sm opacity-50 hover:opacity-100 px-1" title="Renombrar">✏️</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabbar flex gap-1 p-1 rounded-full mb-6">
+      <button class="tab-btn active" data-tab="calc" onclick="switchTab('calc')">🧮 Calculadora</button>
+      <button class="tab-btn" data-tab="menu" onclick="switchTab('menu')">🍽️ Recetario</button>
+      <button class="tab-btn" data-tab="log" onclick="switchTab('log')">📝 Registro</button>
+    </div>
+
+    <!-- ============ TAB: CALCULADORA ============ -->
+    <div id="tab-calc" class="tab-panel">
+
+      <div class="card rounded-3xl p-5 sm:p-6">
+
+        <div class="mb-4">
+          <p class="label-tag mb-2">Sexo</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btnHombre" class="toggle-btn active py-2.5" onclick="setSexo('male')">👨 Hombre</button>
+            <button type="button" id="btnMujer" class="toggle-btn py-2.5" onclick="setSexo('female')">👩 Mujer</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div>
+            <label class="label-tag block mb-1">🎂 Edad</label>
+            <input type="number" id="edad" value="46" min="15" class="field-pill w-full">
+          </div>
+          <div>
+            <label class="label-tag block mb-1">⚖️ Peso</label>
+            <input type="number" id="peso" value="73" min="30" step="0.1" class="field-pill w-full">
+          </div>
+          <div>
+            <label class="label-tag block mb-1">📏 Altura</label>
+            <input type="number" id="altura" value="178" min="100" class="field-pill w-full">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="actividad" class="label-tag block mb-1">🏃 Nivel de actividad</label>
+          <select id="actividad" class="field-pill w-full">
+            <option value="1.2">🛋️ Sedentario — poco o ningún ejercicio</option>
+            <option value="1.375" selected>🚶 Ligero — 1 a 3 días/semana</option>
+            <option value="1.55">🏃 Moderado — 3 a 5 días/semana</option>
+            <option value="1.725">🏋️ Intenso — 6 a 7 días/semana</option>
+            <option value="1.9">🏆 Muy intenso — deportista profesional</option>
+          </select>
+        </div>
+
+        <div class="mb-5">
+          <label class="label-tag block mb-2">🎯 Déficit objetivo</label>
+          <div class="flex gap-2 mb-2">
+            <button type="button" id="chipSuave" class="chip chip-def flex-1 py-2 rounded-full" style="--chip-color:var(--secondary)" onclick="setDeficit(300, this)">🙂 Suave · 300</button>
+            <button type="button" id="chipModerado" class="chip chip-def flex-1 py-2 rounded-full active" style="--chip-color:var(--primary)" onclick="setDeficit(500, this)">💪 Moderado · 500</button>
+            <button type="button" id="chipFuerte" class="chip chip-def flex-1 py-2 rounded-full" style="--chip-color:var(--pink)" onclick="setDeficit(750, this)">🔥 Fuerte · 750</button>
+          </div>
+          <input type="number" id="deficit" value="500" min="100" step="50" oninput="actualizarChipsDeficit(this.value)" class="field-pill w-full text-center">
+        </div>
+
+        <button onclick="calcularDeficit()" class="btn-primary w-full py-3.5 rounded-full">
+          ✨ Calcular calorías
+        </button>
+      </div>
+
+      <!-- Resultados -->
+      <div id="resultado" class="mt-5 hidden">
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div class="stat-card" style="background:#e6faf7;">
+            <p class="text-xs font-bold" style="color:var(--secondary)">🔥 TMB</p>
+            <p id="tmbDisplay" class="font-display text-xl font-extrabold mt-1"></p>
+          </div>
+          <div class="stat-card" style="background:#fff6e3;">
+            <p class="text-xs font-bold" style="color:#c98a00">⚡ GET</p>
+            <p id="getDisplay" class="font-display text-xl font-extrabold mt-1"></p>
+          </div>
+        </div>
+
+        <div class="stat-card text-white" style="background:linear-gradient(135deg, var(--primary), var(--pink));">
+          <p class="text-xs font-bold opacity-90">🎯 OBJETIVO DIARIO — <span id="objetivoNombre"></span></p>
+          <div class="flex items-end justify-between mt-1">
+            <span id="objetivoDisplay" class="font-display text-4xl font-extrabold"></span>
+            <span class="text-xs opacity-90 mb-1">déficit de <span id="deficitDisplay"></span> kcal</span>
+          </div>
+        </div>
+
+        <p id="advertenciaBajaIngesta" class="hidden mt-3 text-sm rounded-2xl px-4 py-3" style="background:#fff3e0; color:#a35a00;">
+          ⚠️ Este objetivo es muy bajo. Considerá consultar a un profesional de la salud o sumar más actividad para poder comer un poco más.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- ============ TAB: RECETARIO ============ -->
+    <div id="tab-menu" class="tab-panel hidden">
+
+      <div class="card rounded-3xl p-5 sm:p-6 mb-4">
+        <p class="label-tag mb-2">Época del año</p>
+        <div id="estacionChips" class="flex flex-wrap gap-2 mb-4"></div>
+
+        <p class="label-tag mb-2">Estilo de alimentación</p>
+        <div id="dietaChips" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div id="menuDias" class="space-y-3"></div>
+
+      <!-- Recetas con detalle -->
+      <p class="font-display font-bold mt-6 mb-1">📖 Recetas con detalle</p>
+      <p class="text-xs mb-3" style="color:var(--ink-soft)">Según la época y el estilo elegidos arriba. Las kcal son aproximadas por porción.</p>
+      <div id="recetasDetalle" class="space-y-2"></div>
+
+      <div class="card rounded-3xl p-5 sm:p-6 mt-4">
+        <p class="font-display font-bold mb-3">➕ Nueva receta completa</p>
+        <input type="text" id="rcNombre" placeholder="Nombre de la receta" class="field-pill w-full mb-2 text-sm">
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <select id="rcComida" class="field-pill w-full text-sm"><option value="d">🍳 Desayuno</option><option value="a">🥗 Almuerzo</option><option value="c">🌙 Cena</option></select>
+          <input type="number" id="rcKcal" placeholder="Kcal por porción" class="field-pill w-full text-sm">
+        </div>
+        <textarea id="rcIng" rows="2" placeholder="Ingredientes" class="field-pill w-full mb-2 text-sm"></textarea>
+        <textarea id="rcPasos" rows="3" placeholder="Preparación" class="field-pill w-full mb-2 text-sm"></textarea>
+        <label class="flex items-center gap-2 text-xs mb-3" style="color:var(--ink-soft)"><input type="checkbox" id="rcTodas"> Mostrar en todas las épocas y estilos (si no, solo en la combinación elegida)</label>
+        <button onclick="agregarRecetaCompleta()" class="btn-soft w-full py-2.5 rounded-full">💾 Guardar receta</button>
+      </div>
+
+      <!-- Agregar receta propia -->
+      <div class="card rounded-3xl p-5 sm:p-6 mt-4">
+        <p class="font-display font-bold mb-1">🧑‍🍳 Cambiá un plato del menú</p>
+        <p class="text-xs mb-3" style="color:var(--ink-soft)">Reemplaza el plato de ese día y comida. Se comparte entre los dos perfiles.</p>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <select id="recDia" class="field-pill w-full text-sm"></select>
+          <select id="recComida" class="field-pill w-full text-sm">
+            <option value="d">🍳 Desayuno</option>
+            <option value="a">🥗 Almuerzo</option>
+            <option value="c">🌙 Cena</option>
+          </select>
+        </div>
+        <input type="text" id="recTexto" placeholder="Ej: Bowl de avena con banana y canela" class="field-pill w-full mb-3 text-sm">
+        <button onclick="agregarReceta()" class="btn-soft w-full py-2.5 rounded-full">➕ Reemplazar plato</button>
+      </div>
+    </div>
+
+    <!-- ============ TAB: REGISTRO ============ -->
+    <div id="tab-log" class="tab-panel hidden">
+
+      <div class="card rounded-3xl p-5 sm:p-6 mb-4">
+        <p class="font-display font-bold mb-3">📝 Anotá el día de <span id="regPerfilNombre"></span></p>
+
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <label class="label-tag block mb-1">📅 Fecha</label>
+            <input type="date" id="regFecha" class="field-pill w-full text-sm">
+          </div>
+          <div>
+            <label class="label-tag block mb-1">⚖️ Peso (kg)</label>
+            <input type="number" id="regPeso" step="0.1" placeholder="Opcional" class="field-pill w-full text-sm">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="label-tag block mb-1">🍽️ Kcal consumidas</label>
+          <input type="number" id="regKcal" placeholder="Opcional" class="field-pill w-full text-sm">
+        </div>
+        <div class="mb-3">
+          <label class="label-tag block mb-1">💬 Nota</label>
+          <input type="text" id="regNota" placeholder="¿Cómo te sentiste hoy?" class="field-pill w-full text-sm">
+        </div>
+        <button onclick="agregarRegistro()" class="btn-primary w-full py-3 rounded-full">💾 Guardar día</button>
+      </div>
+
+      <!-- Gráfico del Historial -->
+      <div id="chartContainer" class="card rounded-3xl p-5 mb-4 hidden">
+        <p class="label-tag mb-3">Historial de peso</p>
+        <div class="flex items-end justify-between h-32 w-full gap-1 pt-4" id="barsWrapper"></div>
+      </div>
+
+      <div id="registroLista" class="space-y-2"></div>
+    </div>
+
+  </div>
+
+<dialog id="authDlg" class="card rounded-3xl p-6 w-[90%] max-w-sm">
+  <p class="font-display font-bold text-lg mb-1">☁️ Tu cuenta</p>
+  <p class="text-xs mb-4" style="color:var(--ink-soft)">Entrá para guardar tus datos en la nube y verlos en cualquier dispositivo.</p>
+  <input type="email" id="authEmail" placeholder="Email" autocomplete="email" class="field-pill w-full mb-2 text-sm">
+  <input type="password" id="authPass" placeholder="Contraseña (mín. 6)" autocomplete="current-password" class="field-pill w-full mb-3 text-sm">
+  <p id="authMsg" class="text-xs mb-3" style="color:var(--primary-dark)" role="alert"></p>
+  <button onclick="authAccion('login')" class="btn-primary w-full py-3 rounded-full mb-2">Iniciar sesión</button>
+  <button onclick="authAccion('signup')" class="btn-soft w-full py-2.5 rounded-full mb-2">Crear cuenta</button>
+  <button onclick="authAccion('google')" class="toggle-btn w-full py-2.5 mb-2 text-sm">Continuar con Google</button>
+  <div class="flex justify-between text-xs mt-1">
+    <button onclick="authAccion('reset')" style="color:var(--ink-soft)">Olvidé mi contraseña</button>
+    <button onclick="document.getElementById('authDlg').close()" style="color:var(--ink-soft)">Cerrar</button>
+  </div>
+</dialog>
+
+<script>
+    // =================================================================
+    // PERFILES (pareja)
+    // =================================================================
+    let sexoActual = 'male';
+    const defaultInputs = {
+        1: { name: 'Persona 1', sexo: 'male', edad: 46, peso: 73, altura: 178, actividad: '1.375', deficit: 500 },
+        2: { name: 'Persona 2', sexo: 'female', edad: 42, peso: 62, altura: 165, actividad: '1.375', deficit: 500 }
+    };
+
+    function loadPerfiles(){
+        try{
+            const saved = JSON.parse(localStorage.getItem('calc_perfiles_v2'));
+            if(saved && saved[1] && saved[2]) return saved;
+        }catch(e){}
+        return JSON.parse(JSON.stringify(defaultInputs));
+    }
+    function savePerfiles(obj){ localStorage.setItem('calc_perfiles_v2', JSON.stringify(obj)); programarSync(); }
+
+    let perfiles = loadPerfiles();
+    let perfilActivo = 1;
+
+    function leerFormularioActual(){
+        perfiles[perfilActivo] = {
+            name: perfiles[perfilActivo].name,
+            sexo: sexoActual,
+            edad: parseFloat(document.getElementById('edad').value) || 30,
+            peso: parseFloat(document.getElementById('peso').value) || 70,
+            altura: parseFloat(document.getElementById('altura').value) || 170,
+            actividad: document.getElementById('actividad').value,
+            deficit: parseFloat(document.getElementById('deficit').value) || 500
+        };
+        savePerfiles(perfiles);
+    }
+
+    function cargarFormularioPerfil(id){
+        const p = perfiles[id];
+        setSexo(p.sexo);
+        document.getElementById('edad').value = p.edad;
+        document.getElementById('peso').value = p.peso;
+        document.getElementById('altura').value = p.altura;
+        document.getElementById('actividad').value = p.actividad;
+        document.getElementById('deficit').value = p.deficit;
+        
+        // Actualizar chips de déficit activo
+        actualizarChipsDeficit(p.deficit);
+    }
+
+    function switchProfile(id){
+        if(id === perfilActivo) return;
+        leerFormularioActual();
+        perfilActivo = id;
+        cargarFormularioPerfil(id);
+        renderProfileChips();
+        calcularDeficit();
+        renderRegistro();
+        actualizarRachaBadge();
+        document.getElementById('regPerfilNombre').textContent = perfiles[perfilActivo].name;
+        document.getElementById('objetivoNombre').textContent = perfiles[perfilActivo].name;
+    }
+
+    function renamePerfil(id){
+        const actual = perfiles[id].name;
+        const nuevo = prompt('Nombre del perfil:', actual);
+        if(nuevo && nuevo.trim()){
+            perfiles[id].name = nuevo.trim();
+            savePerfiles(perfiles);
+            renderProfileChips();
+            document.getElementById('regPerfilNombre').textContent = perfiles[perfilActivo].name;
+            document.getElementById('objetivoNombre').textContent = perfiles[perfilActivo].name;
+        }
+    }
+
+    function renderProfileChips(){
+        const emoji1 = '💪', emoji2 = '❤️';
+        const b1 = document.getElementById('profileBtn1');
+        const b2 = document.getElementById('profileBtn2');
+        b1.textContent = `${emoji1} ${perfiles[1].name}`;
+        b2.textContent = `${emoji2} ${perfiles[2].name}`;
+        b1.classList.toggle('active', perfilActivo === 1);
+        b2.classList.toggle('active', perfilActivo === 2);
+    }
+
+    // =================================================================
+    // NAVEGACIÓN DE TABS
+    // =================================================================
+    function switchTab(name){
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('tab-' + name).classList.remove('hidden');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+        if(name === 'log'){
+            renderRegistro();
+        }
+    }
+
+    // =================================================================
+    // CONFIGURACIÓN DE FORMULARIO
+    // =================================================================
+    function setSexo(sexo) {
+        sexoActual = sexo;
+        const btnHombre = document.getElementById('btnHombre');
+        const btnMujer = document.getElementById('btnMujer');
+        if (sexo === 'male') {
+            btnHombre.classList.add('active');
+            btnMujer.classList.remove('active');
+        } else {
+            btnMujer.classList.add('active');
+            btnHombre.classList.remove('active');
+        }
+    }
+
+    function setDeficit(valor, btn) {
+        document.getElementById('deficit').value = valor;
+        document.querySelectorAll('.chip-def').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    function actualizarChipsDeficit(valor) {
+        document.querySelectorAll('.chip-def').forEach(c => c.classList.remove('active'));
+        if (valor == 300) {
+            document.getElementById('chipSuave').classList.add('active');
+        } else if (valor == 500) {
+            document.getElementById('chipModerado').classList.add('active');
+        } else if (valor == 750) {
+            document.getElementById('chipFuerte').classList.add('active');
+        }
+    }
+
+    function calcularDeficit() {
+        const edad = parseFloat(document.getElementById('edad').value);
+        const peso = parseFloat(document.getElementById('peso').value);
+        const altura = parseFloat(document.getElementById('altura').value);
+        const actividadFactor = parseFloat(document.getElementById('actividad').value);
+        const deficitObjetivo = parseFloat(document.getElementById('deficit').value);
+
+        if (isNaN(edad) || isNaN(peso) || isNaN(altura) || edad <= 0 || peso <= 0 || altura <= 0) {
+            alert('Por favor completa todos los campos con valores numéricos válidos.');
+            return;
+        }
+
+        let tmb;
+        if (sexoActual === 'male') {
+            tmb = (10 * peso) + (6.25 * altura) - (5 * edad) + 5;
+        } else {
+            tmb = (10 * peso) + (6.25 * altura) - (5 * edad) - 161;
+        }
+
+        const get = tmb * actividadFactor;
+        const objetivo = get - deficitObjetivo;
+
+        document.getElementById('tmbDisplay').textContent = `${Math.round(tmb)} kcal`;
+        document.getElementById('getDisplay').textContent = `${Math.round(get)} kcal`;
+        document.getElementById('deficitDisplay').textContent = deficitObjetivo;
+        document.getElementById('objetivoDisplay').textContent = `${Math.round(objetivo)} kcal`;
+
+        document.getElementById('resultado').classList.remove('hidden');
+
+        const adv = document.getElementById('advertenciaBajaIngesta');
+        if ((sexoActual === 'female' && objetivo < 1200) || (sexoActual === 'male' && objetivo < 1500)) {
+            adv.classList.remove('hidden');
+        } else {
+            adv.classList.add('hidden');
+        }
+        
+        leerFormularioActual();
+    }
+
+    // =================================================================
+    // DATOS DEL RECETARIO: 4 estaciones x 4 estilos de alimentación
+    // =================================================================
+    const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+    const menuData = {
+        verano: {
+            omnivoro: [
+                { d: 'Yogur natural con duraznos frescos y semillas de chía.', a: 'Ensalada de pollo a la plancha, tomate, pepino y choclo.', c: 'Merluza a la plancha con zapallitos grillados.' },
+                { d: 'Licuado de melón con leche descremada.', a: 'Ensalada caprese con mozzarella light y albahaca fresca.', c: 'Brochettes de pollo con pimientos y cebolla.' },
+                { d: 'Tostada integral con queso untable light y tomate.', a: 'Ceviche de merluza con limón, cebolla morada y cilantro.', c: 'Milanesa de pollo al horno con ensalada de rúcula.' },
+                { d: 'Yogur con frutillas y granola casera baja en azúcar.', a: 'Wrap integral de atún, lechuga y tomate.', c: 'Pechuga de pollo grillada con ensalada de sandía y menta.' },
+                { d: 'Batido de banana y avena con leche descremada.', a: 'Ensalada de garbanzos, tomate cherry y pepino.', c: 'Salmón al horno con espárragos verdes.' },
+                { d: 'Huevos revueltos con espinaca fresca.', a: 'Bowl de arroz integral, pollo desmenuzado y palta.', c: 'Ensalada tibia de camarones con zucchini.' },
+                { d: 'Ensalada de frutas de estación (durazno, melón, sandía).', a: 'Asado de tira magra con ensalada mixta.', c: 'Sopa fría de tomate (gazpacho) y tortilla de espinaca.' }
+            ],
+            vegetariano: [
+                { d: 'Yogur natural con duraznos y semillas de chía.', a: 'Ensalada caprese con mozzarella light y tomate.', c: 'Tortilla de zapallitos con ensalada verde.' },
+                { d: 'Licuado de melón con leche descremada.', a: 'Wrap integral de hummus, lechuga y tomate.', c: 'Berenjenas grilladas con queso de cabra y rúcula.' },
+                { d: 'Tostada integral con queso untable light y tomate.', a: 'Ensalada de garbanzos, tomate cherry y pepino.', c: 'Revuelto de huevo con espárragos y cherry.' },
+                { d: 'Yogur con frutillas y granola.', a: 'Bowl de quinoa, choclo, tomate y palta.', c: 'Zucchini relleno con arroz integral y queso.' },
+                { d: 'Batido de banana y avena con leche vegetal.', a: 'Ensalada de lentejas, pepino y limón.', c: 'Panqueque de espinaca y ricota con ensalada.' },
+                { d: 'Huevos revueltos con espinaca fresca.', a: 'Bowl de arroz integral, garbanzos y palta.', c: 'Ensalada tibia de zucchini y queso feta.' },
+                { d: 'Ensalada de frutas de estación.', a: 'Milanesa de berenjena al horno con ensalada mixta.', c: 'Sopa fría de calabacín y tortilla de espinaca.' }
+            ],
+            vegano: [
+                { d: 'Chía pudding con leche de coco y duraznos.', a: 'Ensalada de tomate, pepino, choclo y garbanzos.', c: 'Zapallitos grillados con quinoa y almendras.' },
+                { d: 'Licuado de melón y banana con agua o leche de almendra.', a: 'Wrap integral de hummus de garbanzo, rúcula y tomate.', c: 'Tofú marinado al limón con espárragos verdes.' },
+                { d: 'Tostada con palta pisada y sésamo.', a: 'Ensalada templada de lentejas con cebolla asada.', c: 'Zucchini relleno con arroz de coliflor y nueces.' },
+                { d: 'Batido verde de espinaca, manzana y banana.', a: 'Bowl de quinoa con calabacín, tomate cherry y tofu.', c: 'Salteado de garbanzos con brócoli y salsa de soja.' },
+                { d: 'Ensalada de frutas frescas con un puñado de nueces.', a: 'Wrap de porotos negros, cebolla, palta y cilantro.', c: 'Sopa fría de tomate (gazpacho) con semillas.' },
+                { d: 'Tostada integral con mantequilla de maní y banana.', a: 'Ensalada de lentejas con pepino y aderezo de limón.', c: 'Hummus con bastoncitos de zanahoria y pepino.' },
+                { d: 'Avena remojada con arándanos y chía.', a: 'Hamburguesa de porotos negros con ensalada verde.', c: 'Wok de fideos de arroz con verduras variadas.' }
+            ],
+            keto: [
+                { d: 'Huevos fritos con manteca y aguacate.', a: 'Brochettes de pollo con pimientos, panceta y alioli.', c: 'Salmón rosado al horno con espárragos.' },
+                { d: 'Huevos revueltos con queso cheddar y espinacas.', a: 'Pechuga de pollo al horno rellena de queso y panceta.', c: 'Merluza a la plancha con puré de coliflor.' },
+                { d: 'Omelette de queso y champiñones.', a: 'Ensalada tibia de camarones, palta, lechuga y aceite de oliva.', c: 'Costilla de cerdo con manteca de ajo y brócoli.' },
+                { d: 'Rollitos de jamón y queso con mantequilla.', a: 'Pescado blanco al horno con crema de espinacas.', c: 'Hamburguesa casera de carne (sin pan) con queso y huevo frito.' },
+                { d: 'Batido de proteína con crema de leche y cacao amargo.', a: 'Ensalada de pollo, palta, panceta crujiente y aderezo césar.', c: 'Zucchini tallarines con carne picada y salsa bolognesa keto.' },
+                { d: 'Huevos poche con panceta.', a: 'Filete de ternera con puré de coliflor y manteca.', c: 'Pescado grillado con ensalada de rúcula y parmesano.' },
+                { d: 'Café a prueba de balas (Bulletproof) con mantequilla.', a: 'Pechuga de pollo grillada con aceite de coco y brócoli.', c: 'Brochettes de carne y pimientos asados.' }
+            ]
+        },
+        otono: {
+            omnivoro: [
+                { d: 'Taza de avena tibia con manzana y canela.', a: 'Puré de calabaza con pollo al horno sin piel.', c: 'Sopa crema de vegetales con tiritas de carne.' },
+                { d: 'Café con leche y tostada con queso port salut.', a: 'Lentejas guisadas con zanahoria y cubos de lomo.', c: 'Pescado con calabaza asada.' },
+                { d: 'Yogur descremado con manzana picada y nueces.', a: 'Pechuga de pollo asada con puré de batata ligera.', c: 'Wok de verduras con tiritas de carne de res.' },
+                { d: 'Huevo pasado por agua con 1 tostada integral.', a: 'Guiso de porotos con calabaza y pollo picado.', c: 'Sopa de verduras y filet de merluza al horno.' },
+                { d: 'Manzana asada con canela y yogur griego natural.', a: 'Cazuela de pollo, zanahoria, cebolla y berenjena.', c: 'Calabaza rellena con carne picada magra.' },
+                { d: 'Batido de avena, pera y leche descremada.', a: 'Ensalada tibia de lentejas con calabaza asada.', c: 'Filete de pescado a la plancha con puré rústico.' },
+                { d: 'Tostada con revuelto de claras de huevo y espinaca.', a: 'Pechuga de pollo rellena de espinaca con puré de calabaza.', c: 'Sopa minestrone ligera con pollo.' }
+            ],
+            vegetariano: [
+                { d: 'Taza de avena tibia con manzana y canela.', a: 'Puré de calabaza con milanesa de soja al horno.', c: 'Sopa crema de vegetales con cubos de tofu.' },
+                { d: 'Café con leche vegetal y tostada con queso descremado.', a: 'Lentejas guisadas con zanahoria y calabaza.', c: 'Tofu marinado con calabaza asada.' },
+                { d: 'Yogur con manzana picada y nueces.', a: 'Pastel de papa y lentejas (sin carne).', c: 'Wok de verduras con champiñones.' },
+                { d: 'Huevo duro con 1 tostada de centeno.', a: 'Guiso de porotos con calabaza y acelga.', c: 'Sopa de verduras y tortilla de calabacín.' },
+                { d: 'Manzana asada con canela y yogur griego.', a: 'Calabaza rellena con choclo, salsa blanca light y queso.', c: 'Ensalada tibia de quinoa, batata y queso feta.' },
+                { d: 'Batido de avena, pera y leche de almendras.', a: 'Hummus con calabaza asada y pan de pita integral.', c: 'Revuelto de tofu con espinaca y cebolla asada.' },
+                { d: 'Tostada con revuelto de huevo y acelga.', a: 'Risotto integral de hongos y calabaza.', c: 'Sopa minestrone con legumbres.' }
+            ],
+            vegano: [
+                { d: 'Avena tibia con manzana, canela y leche de avena.', a: 'Puré de calabaza con medallón de lentejas casero.', c: 'Sopa crema de vegetales con semillas de calabaza.' },
+                { d: 'Tostada de pan integral con hummus de lentejas.', a: 'Guiso de garbanzos, batata, zanahoria y espinaca.', c: 'Tofu asado con puré de batata ligera.' },
+                { d: 'Batido de pera, espinaca y leche de almendras.', a: 'Wok de fideos de arroz con brócoli y champiñones.', c: 'Ensalada tibia de quinoa, calabaza y nueces.' },
+                { d: 'Fruta de estación (pera) con semillas de chía.', a: 'Guiso de porotos blancos con calabaza y acelga.', c: 'Sopa de verduras con fideos de arroz.' },
+                { d: 'Manzana asada con canela y pasas de uva.', a: 'Calabaza rellena con quinoa y salsa de soja.', c: 'Berenjenas al horno con puré de lentejas.' },
+                { d: 'Tostada integral con mantequilla de almendra.', a: 'Hummus de garbanzos con calabaza asada.', c: 'Salteado de tofu con cebolla, morrón y brócoli.' },
+                { d: 'Chía pudding con compota de pera sin azúcar.', a: 'Guisado de lentejas con batata al horno.', c: 'Sopa de calabaza y jengibre.' }
+            ],
+            keto: [
+                { d: 'Huevos revueltos con manteca de ajo.', a: 'Pollo al horno con crema y brócoli.', c: 'Sopa crema de coliflor con panceta crujiente.' },
+                { d: 'Café bulletproof con aceite de coco.', a: 'Cerdo asado con puré de calabaza keto (baja en porción).', c: 'Salmón a la plancha con espinaca a la crema.' },
+                { d: 'Omelette con queso azul y espinacas.', a: 'Carne de res guisada con champiñones y manteca.', c: 'Wok de vegetales bajos en carbohidratos con panceta.' },
+                { d: 'Huevos poche con panceta.', a: 'Guiso de pollo con crema de leche y brócoli.', c: 'Pescado blanco frito en aceite de coco con ensalada.' },
+                { d: 'Batido keto de aguacate, espinaca y proteína whey.', a: 'Calabacín relleno de carne picada y queso gratinado.', c: 'Entraña de res con manteca de hierbas.' },
+                { d: 'Huevos fritos con chorizo.', a: 'Pechuga de pollo con salsa de champiñones y crema.', c: 'Ensalada de espinacas, palta y queso de cabra.' },
+                { d: 'Omelette con panceta y cebolla.', a: 'Brochettes de carne de res, morrón y cebolla.', c: 'Sopa de pollo espesada con crema de leche.' }
+            ]
+        },
+        invierno: {
+            omnivoro: [
+                { d: 'Tazón de avena caliente con nueces picadas.', a: 'Guiso de lentejas tradicional con carne magra de ternera.', c: 'Sopa de calabaza caliente y tortilla de espinaca.' },
+                { d: 'Café con leche y tostadas de pan integral con queso.', a: 'Pechuga de pollo al horno con puré de papas y zanahoria.', c: 'Merluza al horno con cebolla y morrones.' },
+                { d: 'Yogur caliente con avena remojada y manzana.', a: 'Cazuela de garbanzos con pollo y espinacas.', c: 'Sopa de verduras y lomo a la plancha.' },
+                { d: 'Revuelto de huevos con espinaca cocida.', a: 'Pastel de papa tradicional (carne magra de res).', c: 'Pescado al horno con rodajas de batata.' },
+                { d: 'Infusión caliente con tostada integral con huevo duro.', a: 'Guisado de porotos con pollo desmenuzado y acelga.', c: 'Pollo al horno con puré de calabaza.' },
+                { d: 'Batido caliente de cacao amargo con leche y banana.', a: 'Sopa de pollo y fideos de sémola con verduras.', c: 'Carne asada magra con brócoli al vapor.' },
+                { d: 'Avena con chocolate amargo y almendras.', a: 'Arroz integral con pollo al horno y zanahoria asada.', c: 'Crema de verduras calientes con claras de huevo.' }
+            ],
+            vegetariano: [
+                { d: 'Tazón de avena caliente con nueces.', a: 'Guiso de lentejas con verduras y tofu asado.', c: 'Sopa de calabaza y tortilla de espinaca.' },
+                { d: 'Café con leche vegetal y tostadas con ricota.', a: 'Milanesa de berenjena al horno con puré de papas.', c: 'Tarta de calabaza y queso sin tapa.' },
+                { d: 'Yogur con avena y manzana asada.', a: 'Cazuela de garbanzos con espinacas y queso feta.', c: 'Sopa de verduras y tortilla francesa.' },
+                { d: 'Revuelto de huevos con espinaca y champiñones.', a: 'Pastel de papa con lentejas y queso gratinado.', c: 'Calabaza al horno con queso port salut y ensalada.' },
+                { d: 'Tostada con queso fundido y huevo poche.', a: 'Guisado de porotos con acelga y calabaza.', c: 'Brócoli gratinado al horno con salsa blanca light.' },
+                { d: 'Batido de cacao amargo con leche vegetal.', a: 'Sopa de verduras con fideos y cubos de queso.', c: 'Tofu a la plancha con puré de calabaza.' },
+                { d: 'Avena con chocolate amargo y nueces.', a: 'Risotto de cebada con champiñones.', c: 'Crema de verduras caliente con croutons.' }
+            ],
+            vegano: [
+                { d: 'Avena caliente con leche de avena y nueces.', a: 'Guiso de lentejas con verduras y cubos de calabaza.', c: 'Sopa de calabaza caliente con semillas de girasol.' },
+                { d: 'Tostada de pan integral con puré de porotos.', a: 'Milanesa de garbanzos con puré de papas al oliva.', c: 'Torta de acelga vegana (con harina de garbanzos).' },
+                { d: 'Batido templado de banana, avena y chía.', a: 'Cazuela de garbanzos con espinacas y cebolla.', c: 'Sopa crema de arvejas con tostadas de ajo.' },
+                { d: 'Avena remojada en leche de almendras caliente.', a: 'Pastel de papa con base de lentejas y puré de batata.', c: 'Calabaza asada con tofu marinado y sésamo.' },
+                { d: 'Tostada integral con mantequilla de maní caliente.', a: 'Guisado de porotos blancos con acelga y tomate.', c: 'Wok de coles (repollo, brócoli, coliflor) con sésamo.' },
+                { d: 'Batido de cacao amargo con leche de coco y banana.', a: 'Sopa de verduras con tofu y fideos de arroz.', c: 'Polenta ligera con salsa de tomate y lentejas.' },
+                { d: 'Compota de manzana caliente con canela y chía.', a: 'Hamburguesa de avena y lentejas con brócoli al vapor.', c: 'Sopa minestrone vegana con porotos.' }
+            ],
+            keto: [
+                { d: 'Huevos revueltos con tocino y manteca.', a: 'Guiso de carne de res con brócoli y crema de leche.', c: 'Sopa crema de brócoli con queso cheddar.' },
+                { d: 'Café bulletproof con aceite de coco y manteca.', a: 'Costillas de cerdo al horno con repollitos de Bruselas.', c: 'Salmón con espinaca a la crema.' },
+                { d: 'Omelette de tres quesos con panceta.', a: 'Guiso de pollo con morrones y crema de coco.', c: 'Sopa de verduras bajas en carbohidratos con carne picada.' },
+                { d: 'Huevos poche con espinacas a la manteca.', a: 'Pastel de carne con puré de coliflor y queso gratinado.', c: 'Pescado blanco con manteca de ajo y brócoli.' },
+                { d: 'Batido de proteína caliente con crema de leche.', a: 'Chorizo a la plancha con puré de coliflor y manteca.', c: 'Wok de carne de res, champiñones y espinaca.' },
+                { d: 'Huevos fritos con jamón serrano.', a: 'Pechuga de pollo con salsa de crema y parmesano.', c: 'Ensalada de repollo, panceta crujiente y palta.' },
+                { d: 'Omelette con champiñones y queso azul.', a: 'Brochettes de carne de cerdo y morrones asados.', c: 'Sopa de pollo cremosa con espinaca.' }
+            ]
+        },
+        primavera: {
+            omnivoro: [
+                { d: 'Licuado de banana con frutillas frescas.', a: 'Wok de pollo con brotes de soja, zanahoria y zucchini.', c: 'Ensalada tibia de quinoa, pollo y vegetales.' },
+                { d: 'Yogur descremado con kiwi y granola.', a: 'Filete de merluza con ensalada de rúcula y tomate.', c: 'Milanesa de pollo al horno con puré de calabaza.' },
+                { d: 'Tostada con huevo revuelto y espárragos.', a: 'Ensalada de garbanzos, huevo duro, atún y cebolla.', c: 'Pechuga de pollo grillada con espárragos.' },
+                { d: 'Licuado de pera y espinaca con leche descremada.', a: 'Arroz con mariscos ligeros (calamar, camarón) y ensalada.', c: 'Sopa crema de arvejas y pollo desmenuzado.' },
+                { d: 'Tostada integral con queso untable y frutillas.', a: 'Brochettes de pavo con pimientos y cebollas.', c: 'Salmón a la plancha con ensalada verde.' },
+                { d: 'Yogur con arándanos y semillas de girasol.', a: 'Ensalada de pasta integral con atún, cherry y albahaca.', c: 'Tortilla de acelga al horno.' },
+                { d: 'Revuelto de claras de huevo con tomate y albahaca.', a: 'Pechuga de pollo al limón con ensalada de rúcula.', c: 'Pescado con ensalada de pepino y yogur.' }
+            ],
+            vegetariano: [
+                { d: 'Licuado de banana con frutillas.', a: 'Wok de tofu con brotes de soja, zanahoria y calabacín.', c: 'Ensalada tibia de quinoa y vegetales asados.' },
+                { d: 'Yogur descremado con kiwi y semillas de chía.', a: 'Milanesa de berenjena con ensalada de rúcula y cherry.', c: 'Tarta de acelga individual sin tapa.' },
+                { d: 'Tostada con huevo revuelto y espárragos.', a: 'Ensalada de garbanzos, huevo duro, queso feta y tomate.', c: 'Tortilla de calabacín y cebolla.' },
+                { d: 'Licuado de pera y espinaca con leche de almendras.', a: 'Gnocchis de espinaca con salsa de tomate ligera.', c: 'Sopa de arvejas y revuelto de huevo.' },
+                { d: 'Tostada integral con queso y arándanos.', a: 'Brochettes de tofu y verduras de primavera.', c: 'Zucchini relleno de queso de cabra y tomate asado.' },
+                { d: 'Yogur con frutillas frescas y almendras.', a: 'Ensalada de pasta fría con mozzarella light y cherry.', c: 'Ensalada tibia de chauchas, papa y huevo duro.' },
+                { d: 'Huevo poche con tostada de centeno y palta.', a: 'Arroz primavera con choclo, arvejas y zanahoria.', c: 'Sopa crema de zapallitos y tostadas con queso.' }
+            ],
+            vegano: [
+                { d: 'Licuado de banana con frutillas y leche de almendra.', a: 'Wok de tofu con brotes de soja, zanahoria y zucchini.', c: 'Ensalada tibia de quinoa, lentejas y vegetales.' },
+                { d: 'Pudding de chía con frutillas y coco rallado.', a: 'Ensalada de rúcula, tomate, garbanzos y semillas.', c: 'Tarta de acelga vegana (con masa de avena).' },
+                { d: 'Tostada con palta y espárragos asados.', a: 'Ensalada de lentejas con cherry, pepino y cilantro.', c: 'Wok de chauchas, cebolla y brotes de soja.' },
+                { d: 'Licuado de pera, espinaca y agua de coco.', a: 'Hummus de garbanzos con ensalada verde y pan pita.', c: 'Sopa de arvejas con tofu marinado.' },
+                { d: 'Tostada integral con mermelada de frutilla sin azúcar.', a: 'Brochettes de tofu y pimientos con salsa de soja.', c: 'Zucchini relleno con quinoa y almendras.' },
+                { d: 'Chía pudding con arándanos frescos.', a: 'Ensalada de fideos de arroz fríos con maní y pepino.', c: 'Ensalada de chauchas con sésamo y levadura nutricional.' },
+                { d: 'Batido de frutilla, kiwi y leche de coco.', a: 'Arroz integral salteado con arvejas y cebolla de verdeo.', c: 'Sopa crema de zapallitos con semillas de calabaza.' }
+            ],
+            keto: [
+                { d: 'Huevos revueltos con manteca de hierbas.', a: 'Wok de pollo con zucchini y aceite de coco.', c: 'Salmón con ensalada de rúcula y palta.' },
+                { d: 'Café bulletproof con aceite de coco.', a: 'Pechuga de pollo con salsa de pesto y queso.', c: 'Brochettes de lomo con morrón y tocino.' },
+                { d: 'Omelette con queso feta y espárragos.', a: 'Ensalada de camarones, lechuga, palta y huevo duro.', c: 'Pescado blanco con espinacas salteadas al ajo.' },
+                { d: 'Huevos poche con aguacate y jamón serrano.', a: 'Filete de ternera con mantequilla de ajo y espárragos.', c: 'Sopa cremosa de pollo con brócoli.' },
+                { d: 'Batido de proteína con crema de leche y frutillas.', a: 'Pechuga de pollo rellena de queso de cabra.', c: 'Salmón al horno con ensalada de pepino y eneldo.' },
+                { d: 'Huevos fritos con tocino.', a: 'Wok de cerdo, champiñones y brócoli.', c: 'Ensalada de espinacas con pollo grillado y oliva.' },
+                { d: 'Omelette con tocino y palta.', a: 'Hamburguesa casera (sin pan) con queso y huevo.', c: 'Sopa de mariscos cremosa con apio.' }
+            ]
+        }
+    };
+
+    // =================================================================
+    // GESTIÓN DEL RECETARIO ACTIVO (Chips y renderizado)
+    // =================================================================
+    let estacionActiva = 'verano';
+    let dietaActiva = 'omnivoro';
+
+    // Cargar recetas personalizadas del localStorage
+    function loadRecetasPropias(){
+        try {
+            const saved = localStorage.getItem('calc_recetas_propias');
+            return saved ? JSON.parse(saved) : {};
+        } catch(e){}
+        return {};
+    }
+    function saveRecetasPropias(obj){ localStorage.setItem('calc_recetas_propias', JSON.stringify(obj)); programarSync(); }
+    let recetasPropias = loadRecetasPropias();
+
+    function setupRecetarioUI() {
+        // Renderizar chips de estación
+        const ests = [
+            { id: 'verano', label: '☀️ Verano', color: 'var(--s-verano)' },
+            { id: 'otono', label: '🍁 Otoño', color: 'var(--s-otono)' },
+            { id: 'invierno', label: '❄️ Invierno', color: 'var(--s-invierno)' },
+            { id: 'primavera', label: '🌸 Primavera', color: 'var(--s-primavera)' }
+        ];
+        const estWrapper = document.getElementById('estacionChips');
+        estWrapper.innerHTML = '';
+        ests.forEach(e => {
+            const btn = document.createElement('button');
+            btn.className = `chip px-3 py-1.5 rounded-full ${estacionActiva === e.id ? 'active' : ''}`;
+            btn.style.setProperty('--chip-color', e.color);
+            btn.textContent = e.label;
+            btn.onclick = () => {
+                estacionActiva = e.id;
+                setupRecetarioUI();
+                renderRecetario();
+            };
+            estWrapper.appendChild(btn);
+        });
+
+        // Renderizar chips de estilo de dieta
+        const dietas = [
+            { id: 'omnivoro', label: '🥩 Omnívoro' },
+            { id: 'vegetariano', label: '🥚 Vegetariano' },
+            { id: 'vegano', label: '🌱 Vegano' },
+            { id: 'keto', label: '🥑 Keto' }
+        ];
+        const dietWrapper = document.getElementById('dietaChips');
+        dietWrapper.innerHTML = '';
+        dietas.forEach(d => {
+            const btn = document.createElement('button');
+            btn.className = `chip px-3 py-1.5 rounded-full ${dietaActiva === d.id ? 'active' : ''}`;
+            btn.textContent = d.label;
+            btn.onclick = () => {
+                dietaActiva = d.id;
+                setupRecetarioUI();
+                renderRecetario();
+            };
+            dietWrapper.appendChild(btn);
+        });
+
+        // Poblar selects del form para añadir recetas propias
+        const selectDia = document.getElementById('recDia');
+        selectDia.innerHTML = '';
+        DIAS.forEach((d, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = d;
+            selectDia.appendChild(opt);
+        });
+    }
+
+    function renderRecetario() {
+        const wrapper = document.getElementById('menuDias');
+        wrapper.innerHTML = '';
+
+        const recetasBase = menuData[estacionActiva][dietaActiva];
+
+        DIAS.forEach((dia, idx) => {
+            const base = recetasBase[idx] || { d: 'Yogur con frutas.', a: 'Pollo y ensalada.', c: 'Pescado y brócoli.' };
+            
+            // Buscar si hay recetas personalizadas guardadas para este día específico
+            const propD = recetasPropias[`${idx}_d`] ? `⚡ <span class="text-orange-600">Propia:</span> ${esc(recetasPropias[`${idx}_d`])}` : base.d;
+            const propA = recetasPropias[`${idx}_a`] ? `⚡ <span class="text-orange-600">Propia:</span> ${esc(recetasPropias[`${idx}_a`])}` : base.a;
+            const propC = recetasPropias[`${idx}_c`] ? `⚡ <span class="text-orange-600">Propia:</span> ${esc(recetasPropias[`${idx}_c`])}` : base.c;
+
+            const card = document.createElement('details');
+            card.className = 'day-card card rounded-2xl p-4 transition-all duration-200';
+            card.innerHTML = `
+                <summary class="flex justify-between items-center font-display font-bold">
+                    <span>📅 ${dia}</span>
+                    <span class="text-xs font-semibold px-2 py-1 bg-gray-100 rounded-lg text-gray-500">Ver platos ▼</span>
+                </summary>
+                <div class="mt-3 space-y-2">
+                    <div class="meal-row p-3">
+                        <p class="text-xs font-bold text-orange-500 uppercase tracking-wide">🍳 Desayuno</p>
+                        <p class="text-sm mt-0.5">${propD}</p>
+                    </div>
+                    <div class="meal-row p-3">
+                        <p class="text-xs font-bold text-teal-600 uppercase tracking-wide">🥗 Almuerzo</p>
+                        <p class="text-sm mt-0.5">${propA}</p>
+                    </div>
+                    <div class="meal-row p-3">
+                        <p class="text-xs font-bold text-indigo-500 uppercase tracking-wide">🌙 Cena</p>
+                        <p class="text-sm mt-0.5">${propC}</p>
+                    </div>
+                </div>
+            `;
+            wrapper.appendChild(card);
+        });
+        renderRecetasDetalle();
+    }
+
+    function agregarReceta() {
+        const dia = document.getElementById('recDia').value;
+        const comida = document.getElementById('recComida').value;
+        const texto = document.getElementById('recTexto').value.trim();
+
+        if(!texto) {
+            alert('Por favor ingresá la receta antes de agregarla.');
+            return;
+        }
+
+        recetasPropias[`${dia}_${comida}`] = texto;
+        saveRecetasPropias(recetasPropias);
+        document.getElementById('recTexto').value = '';
+        renderRecetario();
+        
+    }
+
+    // =================================================================
+    // PESTAÑA: REGISTRO DIARIO Y PERSISTENCIA (Racha, Historial)
+    // =================================================================
+    function getLogsKey() { return `calc_logs_perfil_${perfilActivo}`; }
+
+    function loadLogs() {
+        try {
+            const saved = localStorage.getItem(getLogsKey());
+            return saved ? JSON.parse(saved) : [];
+        } catch(e){}
+        return [];
+    }
+
+    function saveLogs(logs) { localStorage.setItem(getLogsKey(), JSON.stringify(logs)); programarSync(); }
+
+    function calcularRacha(logs) {
+        const dias = new Set((logs || []).map(l => l.fecha));
+        const c = new Date(); c.setHours(0,0,0,0);
+        const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (!dias.has(key(c))) c.setDate(c.getDate() - 1); // si hoy aún no registró, cuenta desde ayer
+        let r = 0;
+        while (dias.has(key(c))) { r++; c.setDate(c.getDate() - 1); }
+        return r;
+    }
+
+    function actualizarRachaBadge() {
+        const logs = loadLogs();
+        const racha = calcularRacha(logs);
+        const badge = document.getElementById('streakBadge');
+        if (racha > 0) {
+            document.getElementById('streakCount').textContent = racha;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    function agregarRegistro() {
+        const fecha = document.getElementById('regFecha').value;
+        const peso = parseFloat(document.getElementById('regPeso').value) || null;
+        const kcal = parseFloat(document.getElementById('regKcal').value) || null;
+        const nota = document.getElementById('regNota').value.trim();
+
+        if (!fecha) {
+            alert('Por favor selecciona una fecha válida.');
+            return;
+        }
+
+        const logs = loadLogs();
+        // Evitar duplicados para la misma fecha (actualizar)
+        const indexExistente = logs.findIndex(l => l.fecha === fecha);
+
+        const nuevoLog = { fecha, peso, kcal, nota };
+
+        if (indexExistente !== -1) {
+            logs[indexExistente] = nuevoLog;
+        } else {
+            logs.push(nuevoLog);
+        }
+
+        saveLogs(logs);
+        renderRegistro();
+
+        // Limpiar inputs opcionales
+        document.getElementById('regPeso').value = '';
+        document.getElementById('regKcal').value = '';
+        document.getElementById('regNota').value = '';
+
+        // Actualizar racha al guardar
+        actualizarRachaBadge();
+    }
+
+    function eliminarRegistro(fecha) {
+        if (!confirm('¿Estás seguro de eliminar este registro?')) return;
+        let logs = loadLogs();
+        logs = logs.filter(l => l.fecha !== fecha);
+        saveLogs(logs);
+        renderRegistro();
+        actualizarRachaBadge();
+    }
+
+    function renderRegistro() {
+        const logs = loadLogs();
+        // Ordenar descendente para la lista
+        logs.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+
+        const container = document.getElementById('registroLista');
+        container.innerHTML = '';
+
+        if(logs.length === 0) {
+            container.innerHTML = `<p class="text-center text-xs text-gray-400 py-6">No hay registros guardados para este perfil todavía. ¡Escribe el primero arriba!</p>`;
+            document.getElementById('chartContainer').classList.add('hidden');
+            return;
+        }
+
+        // Renderizar gráfico simple (Tendencia)
+        renderGrafico(logs);
+
+        logs.forEach(l => {
+            // Formatear fecha legible
+            const partesFecha = l.fecha.split('-');
+            const fechaFormateada = `${partesFecha[2]}/${partesFecha[1]}`;
+
+            const item = document.createElement('div');
+            item.className = 'card rounded-2xl p-4 flex justify-between items-center';
+            item.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-sm text-gray-800">${fechaFormateada}</span>
+                        ${l.peso ? `<span class="bg-teal-100 text-teal-800 font-bold text-xs px-2 py-0.5 rounded-full">${l.peso} kg</span>` : ''}
+                        ${l.kcal ? `<span class="bg-orange-100 text-orange-800 font-bold text-xs px-2 py-0.5 rounded-full">${l.kcal} kcal</span>` : ''}
+                    </div>
+                    ${l.nota ? `<p class="text-xs text-gray-500 mt-1">💬 "${esc(l.nota)}"</p>` : ''}
+                </div>
+                <button onclick="eliminarRegistro('${l.fecha}')" class="text-xs text-red-400 hover:text-red-600 p-1">❌</button>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function renderGrafico(logs) {
+        const wrapper = document.getElementById('barsWrapper');
+        wrapper.innerHTML = '';
+
+        // Filtrar registros que tengan peso y ordenarlos cronológicamente
+        const logsConPeso = logs.filter(l => l.peso !== null).sort((a,b) => new Date(a.fecha) - new Date(b.fecha));
+
+        // Mostrar un máximo de los últimos 7 registros con peso
+        const ultimosSiete = logsConPeso.slice(-7);
+
+        if (ultimosSiete.length < 2) {
+            document.getElementById('chartContainer').classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('chartContainer').classList.remove('hidden');
+
+        const pesos = ultimosSiete.map(u => u.peso);
+        const minPeso = Math.min(...pesos) - 0.5;
+        const maxPeso = Math.max(...pesos) + 0.5;
+        const rango = maxPeso - minPeso || 1;
+
+        ultimosSiete.forEach(u => {
+            const alturaPorcentaje = ((u.peso - minPeso) / rango) * 100;
+            const barCol = document.createElement('div');
+            barCol.className = 'flex flex-col items-center flex-1 h-full justify-end';
+
+            // Etiqueta del día
+            const partesFecha = u.fecha.split('-');
+            const etiqueta = `${partesFecha[2]}/${partesFecha[1]}`;
+
+            barCol.innerHTML = `
+                <span class="text-[0.68rem] font-bold text-gray-700 mb-1">${u.peso}</span>
+                <div class="w-4 rounded-t-full bg-gradient-to-t from-teal-400 to-teal-500 transition-all duration-500" style="height: ${Math.max(10, alturaPorcentaje)}%"></div>
+                <span class="text-[0.62rem] font-semibold text-gray-400 mt-1.5">${etiqueta}</span>
+            `;
+            wrapper.appendChild(barCol);
+        });
+    }
+
+    // =================================================================
+    // UTILIDADES
+    // =================================================================
+    function esc(t){ return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function hoyLocal(){ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+    // =================================================================
+    // RECETAS CON DETALLE (base + propias)
+    // e = estaciones (v erano, o toño, i nvierno, p rimavera) · d = estilos (o mnívoro, v egetariano, g = vegano, k eto)
+    // =================================================================
+    const RECETAS_BASE = [
+      ['Avena nocturna con frutas','d','vopi','ovg',320,'½ taza de avena, ¾ taza de leche (o vegetal), 1 cda de chía, fruta de estación','Mezclá todo en un frasco, dejá reposar en la heladera toda la noche y sumá la fruta al servir.'],
+      ['Panqueques de avena y banana','d','vopi','ov',300,'1 banana, 1 huevo, 4 cdas de avena, canela','Procesá todo, cociná porciones en sartén antihaderente 2 min por lado.'],
+      ['Omelette de espinaca y queso','d','vopi','ovk',380,'3 huevos, un puñado de espinaca, 30 g de queso, manteca','Salteá la espinaca, volcá los huevos batidos, agregá el queso y doblá.'],
+      ['Bowl de quinoa y garbanzos','a','vp','ovg',420,'½ taza de quinoa cocida, ½ taza de garbanzos, tomate cherry, pepino, limón, aceite de oliva','Mezclá todo y condimentá con limón, oliva y sal.'],
+      ['Guiso de lentejas liviano','a','oi','ovg',380,'1 taza de lentejas cocidas, zanahoria, cebolla, morrón, pimentón, caldo','Rehogá las verduras, sumá lentejas y caldo y cociná 20 min.'],
+      ['Pollo al limón con verduras asadas','a','vopi','o',350,'1 pechuga, 1 limón, zapallito, zanahoria, cebolla, romero','Horno a 200 °C durante 25 min con el pollo marinado en limón y hierbas.'],
+      ['Salteado de tofu y verduras','a','vopi','vg',330,'150 g de tofu, brócoli, zanahoria, morrón, salsa de soja, jengibre','Dorá el tofu, sumá las verduras y la soja y salteá 5 min a fuego fuerte.'],
+      ['Ensalada de pollo, palta y huevo','a','vp','ok',480,'Pollo cocido, ½ palta, 1 huevo duro, rúcula, aceite de oliva','Armá sobre la rúcula, sumá todo y condimentá con oliva y limón.'],
+      ['Sopa crema de calabaza','c','oi','ovg',180,'300 g de calabaza, 1 cebolla, caldo de verduras, jengibre','Cociná todo 20 min, procesá y ajustá la textura con caldo.'],
+      ['Tortilla de espinaca','c','opi','ov',280,'3 huevos, espinaca, cebolla, queso rallado','Salteá cebolla y espinaca, agregá los huevos y cociná tapada 8 min.'],
+      ['Merluza al horno con papas','c','vopi','o',340,'1 filet de merluza, 1 papa, limón, perejil, oliva','Papas en rodajas al horno 15 min, sumá la merluza con limón y horneá 12 min más.'],
+      ['Salmón con espárragos','c','vopi','ok',450,'1 filet de salmón, espárragos, manteca, limón','Horneá el salmón y los espárragos a 200 °C 12 min y terminá con manteca y limón.'],
+      ['Gazpacho','c','v','ovg',150,'4 tomates maduros, pepino, morrón, ajo, oliva, vinagre','Procesá todo, colá si querés y servilo bien frío.'],
+      ['Hummus con vegetales crudos','c','vopi','ovg',250,'1 taza de garbanzos, tahini, limón, ajo, zanahoria y pepino en bastones','Procesá los garbanzos con tahini, limón y ajo; serví con los bastones.']
+    ];
+    const LET_E = { verano:'v', otono:'o', invierno:'i', primavera:'p' };
+    const LET_D = { omnivoro:'o', vegetariano:'v', vegano:'g', keto:'k' };
+    function loadRecetasUsuario(){ try { return JSON.parse(localStorage.getItem('calc_recetas_v3')) || []; } catch(e){ return []; } }
+    function saveRecetasUsuario(a){ localStorage.setItem('calc_recetas_v3', JSON.stringify(a)); programarSync(); }
+    let recetasUsuario = loadRecetasUsuario();
+
+    function renderRecetasDetalle(){
+        const e = LET_E[estacionActiva], d = LET_D[dietaActiva], ICON = { d:'🍳', a:'🥗', c:'🌙' };
+        const lista = [
+            ...RECETAS_BASE.map(r => ({ n:r[0], c:r[1], e:r[2], d:r[3], k:r[4], i:r[5], p:r[6] })),
+            ...recetasUsuario.map(r => ({ ...r, propia:true }))
+        ].filter(r => r.e.includes(e) && r.d.includes(d));
+        document.getElementById('recetasDetalle').innerHTML = lista.length ? lista.map(r => `
+            <details class="day-card card rounded-2xl p-4">
+              <summary class="flex justify-between items-center font-display font-bold text-sm"><span>${ICON[r.c]} ${esc(r.n)}${r.propia ? ' ⚡' : ''}</span><span class="text-xs font-semibold" style="color:var(--ink-soft)">${r.k ? esc(r.k) + ' kcal' : ''}</span></summary>
+              <div class="mt-3 text-sm space-y-2">
+                ${r.i ? `<p><b>Ingredientes:</b> ${esc(r.i)}</p>` : ''}
+                ${r.p ? `<p><b>Preparación:</b> ${esc(r.p)}</p>` : ''}
+                ${r.propia ? `<button onclick="borrarReceta('${esc(r.id)}')" class="text-xs text-red-500">🗑️ Eliminar</button>` : ''}
+              </div>
+            </details>`).join('')
+          : '<p class="text-xs text-center py-4" style="color:var(--ink-soft)">Todavía no hay recetas para esta combinación. Sumá la primera abajo.</p>';
+    }
+
+    function agregarRecetaCompleta(){
+        const v = id => document.getElementById(id).value.trim();
+        if (!v('rcNombre')) { alert('Poné un nombre a la receta.'); return; }
+        const todas = document.getElementById('rcTodas').checked;
+        recetasUsuario.push({
+            id: 'r' + Date.now(), n: v('rcNombre'), c: v('rcComida'), k: parseFloat(v('rcKcal')) || 0, i: v('rcIng'), p: v('rcPasos'),
+            e: todas ? 'vopi' : LET_E[estacionActiva], d: todas ? 'ovgk' : LET_D[dietaActiva]
+        });
+        saveRecetasUsuario(recetasUsuario);
+        ['rcNombre','rcKcal','rcIng','rcPasos'].forEach(id => document.getElementById(id).value = '');
+        renderRecetasDetalle();
+    }
+    function borrarReceta(id){
+        if (!confirm('¿Eliminar esta receta?')) return;
+        recetasUsuario = recetasUsuario.filter(r => r.id !== id);
+        saveRecetasUsuario(recetasUsuario);
+        renderRecetasDetalle();
+    }
+
+    // =================================================================
+    // CUENTA Y NUBE (Firebase Auth + Firestore)
+    // Completá estos datos con los de tu proyecto de Firebase.
+    // Mientras tengan "TU_...", la app funciona igual, solo en este dispositivo.
+    // =================================================================
+    const FIREBASE_CONFIG = {
+        apiKey: 'TU_API_KEY',
+        authDomain: 'TU_PROYECTO.firebaseapp.com',
+        projectId: 'TU_PROYECTO',
+        appId: 'TU_APP_ID'
+    };
+    const KEYS_NUBE = ['calc_perfiles_v2','calc_logs_perfil_1','calc_logs_perfil_2','calc_recetas_propias','calc_recetas_v3'];
+    let fbAuth = null, fbDb = null, usuario = null, syncTimer = null;
+
+    function initNube(){
+        if (typeof firebase === 'undefined' || FIREBASE_CONFIG.apiKey === 'TU_API_KEY') return;
+        firebase.initializeApp(FIREBASE_CONFIG);
+        fbAuth = firebase.auth(); fbDb = firebase.firestore();
+        document.getElementById('authBar').style.display = 'flex';
+        fbAuth.onAuthStateChanged(async u => { usuario = u; renderAuthBar(); if (u) await cargarNube(); });
+    }
+    function renderAuthBar(){
+        const b = document.getElementById('authBar');
+        if (!fbAuth) return;
+        b.innerHTML = usuario
+          ? `<span class="text-xs truncate" style="color:var(--ink-soft)">☁️ ${esc(usuario.email)}</span><button class="btn-soft text-xs px-3 py-1.5 rounded-full" onclick="cerrarSesion()">Salir</button>`
+          : `<span class="text-xs" style="color:var(--ink-soft)">Tus datos están solo en este dispositivo</span><button class="btn-soft text-xs px-3 py-1.5 rounded-full" onclick="document.getElementById('authDlg').showModal()">Iniciar sesión</button>`;
+    }
+    function datosLocales(){ const o = {}; KEYS_NUBE.forEach(k => o[k] = localStorage.getItem(k)); return o; }
+    function subirNube(){
+        if (!usuario) return Promise.resolve();
+        return fbDb.collection('usuarios').doc(usuario.uid)
+            .set({ datos: datosLocales(), actualizado: firebase.firestore.FieldValue.serverTimestamp() })
+            .catch(e => console.error('Error al guardar en la nube:', e));
+    }
+    function programarSync(){ if (!usuario) return; clearTimeout(syncTimer); syncTimer = setTimeout(subirNube, 800); }
+    async function cargarNube(){
+        try {
+            const snap = await fbDb.collection('usuarios').doc(usuario.uid).get();
+            if (snap.exists) {
+                const d = snap.data().datos || {};
+                KEYS_NUBE.forEach(k => d[k] != null ? localStorage.setItem(k, d[k]) : localStorage.removeItem(k));
+                recargarDatos();
+            } else { await subirNube(); } // cuenta nueva: sube lo que ya había en este dispositivo
+        } catch(e){ alert('No se pudieron leer tus datos de la nube: ' + e.message); }
+    }
+    function recargarDatos(){
+        perfiles = loadPerfiles(); recetasPropias = loadRecetasPropias(); recetasUsuario = loadRecetasUsuario();
+        cargarFormularioPerfil(perfilActivo); renderProfileChips(); calcularDeficit();
+        document.getElementById('regPerfilNombre').textContent = perfiles[perfilActivo].name;
+        document.getElementById('objetivoNombre').textContent = perfiles[perfilActivo].name;
+        renderRecetario(); renderRegistro(); actualizarRachaBadge();
+    }
+    async function cerrarSesion(){
+        if (!confirm('¿Cerrar sesión? Tus datos quedan guardados en la nube.')) return;
+        clearTimeout(syncTimer); await subirNube();
+        await fbAuth.signOut();
+        KEYS_NUBE.forEach(k => localStorage.removeItem(k)); // evita mezclar datos entre cuentas en este dispositivo
+        recargarDatos();
+    }
+    const ERR_AUTH = {
+        'auth/invalid-credential':'Email o contraseña incorrectos.', 'auth/invalid-email':'El email no es válido.',
+        'auth/email-already-in-use':'Ese email ya tiene cuenta. Probá iniciar sesión.', 'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+        'auth/popup-closed-by-user':'Cerraste la ventana de Google.', 'auth/too-many-requests':'Demasiados intentos. Esperá un momento.',
+        'auth/network-request-failed':'Sin conexión a internet.'
+    };
+    async function authAccion(tipo){
+        const msg = document.getElementById('authMsg'); msg.textContent = '';
+        const email = document.getElementById('authEmail').value.trim(), pass = document.getElementById('authPass').value;
+        try {
+            if (tipo === 'login') await fbAuth.signInWithEmailAndPassword(email, pass);
+            else if (tipo === 'signup') await fbAuth.createUserWithEmailAndPassword(email, pass);
+            else if (tipo === 'google') await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+            else { if (!email) { msg.textContent = 'Escribí tu email primero.'; return; } await fbAuth.sendPasswordResetEmail(email); msg.textContent = 'Te enviamos un email para restablecer la contraseña.'; return; }
+            document.getElementById('authDlg').close();
+        } catch(e){ msg.textContent = ERR_AUTH[e.code] || e.message; }
+    }
+
+    // =================================================================
+    // INICIALIZACIÓN
+    // =================================================================
+    window.onload = function() {
+        // Inicializar fecha de hoy en el form de registro
+        const hoy = hoyLocal();
+        document.getElementById('regFecha').value = hoy;
+
+        // Cargar primer perfil
+        renderProfileChips();
+        cargarFormularioPerfil(perfilActivo);
+        document.getElementById('regPerfilNombre').textContent = perfiles[perfilActivo].name;
+        document.getElementById('objetivoNombre').textContent = perfiles[perfilActivo].name;
+
+        // Inicializar menú de recetas
+        setupRecetarioUI();
+        renderRecetario();
+
+        initNube();
+        renderAuthBar();
+
+        // Calcular calorías por primera vez
+        calcularDeficit();
+
+        // Cargar registros e historial
+        renderRegistro();
+        actualizarRachaBadge();
+    };
+</script>
+
+</body>
+</html>
